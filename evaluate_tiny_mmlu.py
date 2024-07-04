@@ -20,6 +20,7 @@ import torch
 
 from gemma_pytorch.gemma import config
 from gemma_pytorch.gemma import model as gemma_model
+from datasets import load_dataset
 
 
 @contextlib.contextmanager
@@ -28,7 +29,6 @@ def _set_default_tensor_type(dtype: torch.dtype):
     torch.set_default_dtype(dtype)
     yield
     torch.set_default_dtype(torch.float)
-
 
 def main(args):
     # Construct the model config.
@@ -49,14 +49,11 @@ def main(args):
         model = model.to(device).eval()
     print("Model loading done")
 
-    # Generate the response.
-    result = model.generate(args.prompt, device, output_len=args.output_len)
-
-    # Print the prompts and results.
-    print('======================================')
-    print(f'PROMPT: {args.prompt}')
-    print(f'RESULT: {result}')
-    print('======================================')
+    dataset = load_dataset("tinybenchmarks/tinyMMLU")
+    for batch in dataset.iter(batch_size=args.batch_size):
+        formatted_input = batch["input_formatted"]
+        result = model.generate(formatted_input, device, output_len=args.output_len, token_compression=args.token_compression)
+        print(result)
 
 
 if __name__ == "__main__":
@@ -71,9 +68,10 @@ if __name__ == "__main__":
                         default="cpu",
                         choices=["cpu", "cuda"])
     parser.add_argument("--output_len", type=int, default=100)
+    parser.add_argument("--token_compression", type=int, default=1)
+    parser.add_argument("--batch_size", type=int, default=4)
     parser.add_argument("--seed", type=int, default=12345)
     parser.add_argument("--quant", action='store_true')
-    parser.add_argument("--prompt", type=str, default="The meaning of life is")
     args = parser.parse_args()
 
     main(args)

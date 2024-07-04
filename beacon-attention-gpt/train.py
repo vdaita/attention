@@ -23,7 +23,7 @@ def train_model(use_embedding: bool, use_custom_attn_mask: bool, num_epochs: int
     model.to(device)
 
     if use_embedding:
-        beacon_embedding = BeaconEmbedding(vocab_size=model.config.vocab_size, n_embed=model.config.n_embd, window_length=4)
+        beacon_embedding = BeaconEmbedding(embedding=model.get_input_embeddings(), vocab_size=model.config.vocab_size, n_embed=model.config.n_embd, window_length=4)
         model.set_input_embeddings(beacon_embedding)
 
     model.train()
@@ -32,6 +32,8 @@ def train_model(use_embedding: bool, use_custom_attn_mask: bool, num_epochs: int
     step_times = []
 
     optimizer = AdamW(model.parameters(), lr=5e-5)
+    train_dataloader = ...
+
     num_training_steps = num_epochs * len(train_dataloader)
 
     for epoch in range(num_epochs):
