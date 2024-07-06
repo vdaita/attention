@@ -51,4 +51,4 @@ def generate_beacon_attention_mask_2d(size, window_length=4, direct_window_multi
     for i in range(size):
         start_index = max(0, i - window_length*direct_window_multiple)
         mask_tensor[i, start_index:i] = 1
-    return mask_tensor.tril(mask_tensor)
+    return mask_tensor.tril()
