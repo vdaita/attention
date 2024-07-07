@@ -18,7 +18,7 @@ class BeaconEmbedding(nn.Module):
         nn.init.normal(self.nb_embed)
     
     def forward(self, input: Tensor) -> Tensor:
-        N, _ = input.shape
+        _, N = input.shape
         regular_embedding = self.embedding(input)
         beacon_tensor = torch.stack([self.nb_embed] * N)
         beacon_tensor[::self.window_length] = self.b_embed
