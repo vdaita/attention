@@ -27,7 +27,7 @@ class BeaconEmbedding(nn.Module):
         B, N = input.shape
         regular_embedding = self.embedding(input)
         beacon_tensor = torch.zeros((B, N, self.n_embed))
-        beacon_tensor[:, :, ::self.window_length] = self.b_embed
+        beacon_tensor[:, ::self.window_length, :] = self.b_embed
         return regular_embedding + beacon_tensor
 
 def generate_beacon_attention_mask_2d(size, window_length=4, direct_window_multiple=1, device=None):
