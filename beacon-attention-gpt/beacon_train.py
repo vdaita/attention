@@ -52,7 +52,7 @@ parser.add_argument('-w', '--window-size', type=int)
 args = parser.parse_args()
 
 use_embedding = args.use_embedding
-use_custom_attn_mask = args.use_custom_mask
+use_custom_attn_mask = args.use_custom_attn_mask
 use_normal_initialization = args.use_normal_initialization
 window_size = args.window_size
 
