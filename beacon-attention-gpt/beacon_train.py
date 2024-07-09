@@ -62,7 +62,7 @@ print("Custom attention mask: ", use_custom_attn_mask)
 print("Use custom embedding: ", use_embedding)
 
 num_epochs = 1
-batch_size = 128
+batch_size = 64
 block_size = 128
 
 # %%
