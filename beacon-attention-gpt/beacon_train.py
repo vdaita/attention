@@ -155,10 +155,10 @@ optimizer = AdamW(model.parameters(), lr=5e-5)
 num_training_steps = num_epochs * len(train_dataloader)
 
 # %%
-print(batch_size, beacon_attention_mask.shape)
+print("Batch size: ", batch_size)
 
 # %%
-print(beacon_attention_mask[:10, :10])
+print("Attention mask: ", beacon_attention_mask[0][:10, :10])
 
 # %%
 def evaluate():
@@ -172,7 +172,7 @@ def evaluate():
                 outputs = model(batch["input_ids"], labels=batch["input_ids"])
 
         losses.append(accelerator.gather(outputs.loss))
-    print(losses)
+    # print(losses)
     loss = torch.mean(torch.Tensor(losses))
     try:
         perplexity = torch.exp(loss)

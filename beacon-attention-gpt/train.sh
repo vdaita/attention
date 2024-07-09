@@ -4,18 +4,18 @@ wandb login
 python beacon_train.py -w 1
 
 # Transformers with 
-python beacon_train.py -e -m -n 2
-python beacon_train.py -e -m 2
-python beacon_train.py -m 2
+python beacon_train.py -e -m -n -w 2
+python beacon_train.py -e -m -w 2
+python beacon_train.py -m -w 2
 
-python beacon_train.py -e -m -n 4
-python beacon_train.py -e -m 4
-python beacon_train.py -m 4
+python beacon_train.py -e -m -n -w 4
+python beacon_train.py -e -m -w 4
+python beacon_train.py -m -w 4
 
-python beacon_train.py -e -m -n 8
-python beacon_train.py -e -m 8
-python beacon_train.py -m 8
+python beacon_train.py -e -m -n -w 8
+python beacon_train.py -e -m -w 8
+python beacon_train.py -m -w 8
 
-python beacon_train.py -e -m -n 16
-python beacon_train.py -e -m 16
-python beacon_train.py -m 16
+python beacon_train.py -e -m -n -w 16
+python beacon_train.py -e -m -w 16
+python beacon_train.py -m -w 16
