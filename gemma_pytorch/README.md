@@ -1,3 +1,5 @@
+This folder tries to see if embeddings can be averaged in small groups with similar performance to regular embeddings. 
+
 # Gemma in PyTorch
 
 **Gemma** is a family of lightweight, state-of-the art open models built from research and technology used to create Google Gemini models. They are text-to-text, decoder-only large language models, available in English, with open weights, pre-trained variants, and instruction-tuned variants. For more details, please check out the following links:
