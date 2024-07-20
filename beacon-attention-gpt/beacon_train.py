@@ -28,6 +28,7 @@ class BeaconEmbedding(nn.Module):
         regular_embedding = self.embedding(input)
         beacon_tensor = torch.zeros((B, N, self.n_embed))
         beacon_tensor[:, ::self.window_length, :] = self.b_embed
+        beacon_tensor = beacon_tensor.to(regular_embedding.device)
         return regular_embedding + beacon_tensor
 
 def generate_beacon_attention_mask_2d(size, window_length=4, direct_window_multiple=1, device=None):
@@ -42,14 +43,16 @@ def generate_beacon_attention_mask_2d(size, window_length=4, direct_window_multi
 # Change config here:
 
 parser = argparse.ArgumentParser(
-    prog="BeaconEmbeddingTrain",
+   prog="BeaconEmbeddingTrain",
 )
-parser.add_argument('-e', '--use-embedding', action="store_true")
-parser.add_argument('-m', '--use-custom-attn-mask', action="store_true")
-parser.add_argument('-n', '--use-normal-initialization', action="store_true")
-parser.add_argument('-w', '--window-size', type=int)
+parser.add_argument('-e', '--use-embedding', action="store_true", help="Option for user to use embedding")
+parser.add_argument('-m', '--use-custom-attn-mask', action="store_true", help="Use the custom attention mask (BeaconAttention)")
+parser.add_argument('-n', '--use-normal-initialization', action="store_true", help="Use normal intialization")
+parser.add_argument('-w', '--window-size', type=int, help="Wind")
 
 args = parser.parse_args()
+
+
 
 use_embedding = args.use_embedding
 use_custom_attn_mask = args.use_custom_attn_mask
@@ -145,6 +148,7 @@ model.config
 
 if use_embedding:
     beacon_embedding = BeaconEmbedding(embedding=model.get_input_embeddings(), vocab_size=model.config.vocab_size, n_embed=model.config.hidden_size, window_length=window_size, use_normal_initialization=use_normal_initialization)
+    beacon_embedding = beacon_embedding.to(model.device)
     model.set_input_embeddings(beacon_embedding)
 
 beacon_attention_mask = generate_beacon_attention_mask_2d(block_size, window_length=window_size, device=device)
