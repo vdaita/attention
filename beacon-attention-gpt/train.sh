@@ -3,34 +3,20 @@ wait
 wandb login &
 wait
 # Default transformer
-python beacon_train.py -w 1 &
+# python3 beacon_train.py -w 1 &
 wait
 
-# Transformers with 
-python beacon_train.py -e -m -n -w 2 &
+python3 beacon_train.py -e -m -w 4 &
 wait
-python beacon_train.py -e -m -w 2 &
-wait
-python beacon_train.py -m -w 2 &
+python3 beacon_train.py -m -w 4 &
 wait
 
-python beacon_train.py -e -m -n -w 4 &
+python3 beacon_train.py -e -m -w 8 &
 wait
-python beacon_train.py -e -m -w 4 &
-wait
-python beacon_train.py -m -w 4 &
-wait
+python3 beacon_train.py -m -w 8 &
+wait 
 
-python beacon_train.py -e -m -n -w 8 &
+python3 beacon_train.py -e -m -w 16 &
 wait
-python beacon_train.py -e -m -w 8 &
-wait
-python beacon_train.py -m -w 8 &
-wait
-
-python beacon_train.py -e -m -n -w 16 &
-wait
-python beacon_train.py -e -m -w 16 &
-wait
-python beacon_train.py -m -w 16 &
+python3 beacon_train.py -m -w 16 &
 wait

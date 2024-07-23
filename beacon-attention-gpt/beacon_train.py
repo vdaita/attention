@@ -8,20 +8,16 @@ from torch import nn, Tensor
 import argparse
 
 class BeaconEmbedding(nn.Module):
-    def __init__(self, embedding: nn.Embedding, vocab_size: int, n_embed: int, window_length: int, use_normal_initialization: bool,*args, **kwargs):
+    def __init__(self, embedding: nn.Embedding, vocab_size: int, n_embed: int, window_length: int, *args, **kwargs):
         super().__init__()
         self.n_embed = n_embed
         self.b_embed = nn.Parameter(torch.empty(n_embed), requires_grad=True)
         self.window_length = window_length
         self.embedding = embedding
-        self.use_normal_initialization = use_normal_initialization
         self.reset_parameters()
     
     def reset_parameters(self):
-        if self.use_normal_initialization:
-            nn.init.normal_(self.b_embed)
-        else:
-            nn.init.zeros_(self.b_embed)
+        nn.init.zeros_(self.b_embed)
 
     def forward(self, input: Tensor) -> Tensor:
         B, N = input.shape
@@ -33,11 +29,13 @@ class BeaconEmbedding(nn.Module):
 
 def generate_beacon_attention_mask_2d(size, window_length=4, direct_window_multiple=1, device=None):
     mask_tensor = torch.zeros((size, size), device=device)
-    mask_tensor[::window_length, :] = 1
+    mask_tensor[:, ::window_length] = 1
     for i in range(size):
         start_index = max(0, i - window_length*direct_window_multiple)
         mask_tensor[i, start_index:i] = 1
+        mask_tensor[i, i] = 0
     return mask_tensor.tril()
+
 
 # %%
 # Change config here:
@@ -47,25 +45,20 @@ parser = argparse.ArgumentParser(
 )
 parser.add_argument('-e', '--use-embedding', action="store_true", help="Option for user to use embedding")
 parser.add_argument('-m', '--use-custom-attn-mask', action="store_true", help="Use the custom attention mask (BeaconAttention)")
-parser.add_argument('-n', '--use-normal-initialization', action="store_true", help="Use normal intialization")
-parser.add_argument('-w', '--window-size', type=int, help="Wind")
+parser.add_argument('-w', '--window-size', type=int, help="Window Size")
 
 args = parser.parse_args()
 
-
-
 use_embedding = args.use_embedding
 use_custom_attn_mask = args.use_custom_attn_mask
-use_normal_initialization = args.use_normal_initialization
 window_size = args.window_size
 
 print("Window size: ", window_size)
-print("Normal initialization: ", use_normal_initialization)
 print("Custom attention mask: ", use_custom_attn_mask)
 print("Use custom embedding: ", use_embedding)
 
 num_epochs = 1
-batch_size = 64
+batch_size = 128
 block_size = 128
 
 # %%
@@ -137,7 +130,7 @@ def get_grouped_params(model, no_decay=["bias", "LayerNorm.weight"]):
     ]
 
 # %%
-model = AutoModelForCausalLM.from_pretrained('roneneldan/TinyStories-3M')
+model = AutoModelForCausalLM.from_pretrained('roneneldan/TinyStories-1m')
 
 model.to(device)
 
@@ -147,22 +140,21 @@ model.config
 # %%
 
 if use_embedding:
-    beacon_embedding = BeaconEmbedding(embedding=model.get_input_embeddings(), vocab_size=model.config.vocab_size, n_embed=model.config.hidden_size, window_length=window_size, use_normal_initialization=use_normal_initialization)
+    beacon_embedding = BeaconEmbedding(embedding=model.get_input_embeddings(), vocab_size=model.config.vocab_size, n_embed=model.config.hidden_size, window_length=window_size)
     beacon_embedding = beacon_embedding.to(model.device)
     model.set_input_embeddings(beacon_embedding)
 
 beacon_attention_mask = generate_beacon_attention_mask_2d(block_size, window_length=window_size, device=device)
-beacon_attention_mask = beacon_attention_mask.unsqueeze(0).repeat(batch_size, 1, 1)
-
-
-optimizer = AdamW(model.parameters(), lr=5e-5)
-num_training_steps = num_epochs * len(train_dataloader)
+# beacon_attention_mask = beacon_attention_mask.unsqueeze(0).repeat(batch_size, 1, 1)
 
 # %%
 print("Batch size: ", batch_size)
 
 # %%
-print("Attention mask: ", beacon_attention_mask[0][:10, :10])
+print("Attention mask: ", beacon_attention_mask[:10, :10])
+
+optimizer = AdamW(model.parameters(), lr=5e-5)
+num_training_steps = num_epochs * len(train_dataloader)
 
 # %%
 def evaluate():
@@ -171,7 +163,9 @@ def evaluate():
     for step, batch in enumerate(eval_dataloader):
         with torch.no_grad():
             if use_custom_attn_mask:
-                outputs = model(batch["input_ids"], labels=batch["input_ids"], attention_mask=beacon_attention_mask)
+                # print("Shape: ", batch["input_ids"].shape, beacon_attention_mask.shape)
+                X, Y = batch["input_ids"].shape
+                outputs = model(batch["input_ids"], labels=batch["input_ids"], attention_mask=beacon_attention_mask[:X, :Y])
             else:
                 outputs = model(batch["input_ids"], labels=batch["input_ids"])
 
@@ -190,19 +184,18 @@ import wandb
 
 accelerator = Accelerator() # Logging with wandb here isn't working as expected for some reason
 wandb.init(
-    project="beacon-attention",
+    project="beacon-attention-1m",
     config={
         "use_custom_embedding": use_embedding,
         "use_custom_attn_mask": use_custom_attn_mask,
         "window_size": window_size,
-        "use_normal_initialization": use_normal_initialization
     }
 )
 
 model, optimizer, train_dataloader, eval_dataloader = accelerator.prepare(model, optimizer, train_dataloader, eval_dataloader)
 
 # %%
-model_name = f"{'beacon_embed' if use_embedding else 'no_beacon_embed'}_{'beacon_attn_mask' if use_custom_attn_mask else 'regular_attn_mask'}_window_size_{window_size}_{'normal_init' if use_normal_initialization else 'zeros_init'}_model"
+model_name = f"{'beacon_embed' if use_embedding else 'no_beacon_embed'}_{'beacon_attn_mask' if use_custom_attn_mask else 'regular_attn_mask'}_window_size_{window_size}_model"
 output_dir = f"./models/{model_name}"
 if not(os.path.exists(output_dir)):
     os.makedirs(output_dir)
@@ -223,11 +216,14 @@ model.train()
 completed_steps = 0
 step_start_time = time.perf_counter()
 
+eval_loss, perplexity = evaluate()
+
 for epoch in range(num_epochs):
     for step, batch in tqdm(enumerate(train_dataloader, start=1), total=num_training_steps):
-        T = batch['input_ids'].shape[1] # B, T
+        X, Y = batch['input_ids'].shape
         if use_custom_attn_mask:
-            logits = model(input_ids=batch["input_ids"], attention_mask=beacon_attention_mask).logits
+            # print("Shape: ", batch["input_ids"].shape, beacon_attention_mask.shape)
+            logits = model(input_ids=batch["input_ids"], attention_mask=beacon_attention_mask[:X, :Y]).logits
         else:
             logits = model(input_ids=batch["input_ids"]).logits
         loss = causal_lm_loss(batch["input_ids"], logits)
