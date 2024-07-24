@@ -30,13 +30,11 @@ parser.add_argument('-w', '--window-size', type=int, help="Window Size")
 
 args = parser.parse_args()
 
-use_embedding = args.use_embedding
 use_custom_attn_mask = args.use_custom_attn_mask
 window_size = args.window_size
 
 print("Window size: ", window_size)
 print("Custom attention mask: ", use_custom_attn_mask)
-print("Use custom embedding: ", use_embedding)
 
 num_epochs = 1
 batch_size = 128
@@ -176,14 +174,14 @@ wandb.init(
     config={
         "use_custom_attn_mask": use_custom_attn_mask,
         "window_size": window_size,
-        "summarization": True
+        "summarization_token": True
     }
 )
 
 model, optimizer, train_dataloader, eval_dataloader = accelerator.prepare(model, optimizer, train_dataloader, eval_dataloader)
 
 # %%
-model_name = f"{'beacon_embed' if use_embedding else 'no_beacon_embed'}_{'beacon_attn_mask' if use_custom_attn_mask else 'regular_attn_mask'}_window_size_{window_size}_model"
+model_name = f"summarize_token_{'beacon_attn_mask' if use_custom_attn_mask else 'regular_attn_mask'}_window_size_{window_size}_model"
 output_dir = f"./models/{model_name}"
 if not(os.path.exists(output_dir)):
     os.makedirs(output_dir)
