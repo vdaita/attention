@@ -7,26 +7,6 @@ import time
 from torch import nn, Tensor
 import argparse
 
-class BeaconEmbedding(nn.Module):
-    def __init__(self, embedding: nn.Embedding, vocab_size: int, n_embed: int, window_length: int, *args, **kwargs):
-        super().__init__()
-        self.n_embed = n_embed
-        self.b_embed = nn.Parameter(torch.empty(n_embed), requires_grad=True)
-        self.window_length = window_length
-        self.embedding = embedding
-        self.reset_parameters()
-    
-    def reset_parameters(self):
-        nn.init.zeros_(self.b_embed)
-
-    def forward(self, input: Tensor) -> Tensor:
-        B, N = input.shape
-        regular_embedding = self.embedding(input)
-        beacon_tensor = torch.zeros((B, N, self.n_embed))
-        beacon_tensor[:, ::self.window_length, :] = self.b_embed
-        beacon_tensor = beacon_tensor.to(regular_embedding.device)
-        return regular_embedding + beacon_tensor
-
 def generate_beacon_attention_mask_2d(size, window_length=4, direct_window_multiple=1, device=None):
     mask_tensor = torch.zeros((size, size), device=device)
     mask_tensor[:, ::window_length] = 1
@@ -36,6 +16,7 @@ def generate_beacon_attention_mask_2d(size, window_length=4, direct_window_multi
         mask_tensor[i, i] = 0
     return mask_tensor.tril()
 
+sep_token = 186 # This corresponds to token: þ in the tokenizer for TinyStories-1m
 
 # %%
 # Change config here:
@@ -43,7 +24,6 @@ def generate_beacon_attention_mask_2d(size, window_length=4, direct_window_multi
 parser = argparse.ArgumentParser(
    prog="BeaconEmbeddingTrain",
 )
-parser.add_argument('-e', '--use-embedding', action="store_true", help="Option for user to use embedding")
 parser.add_argument('-m', '--use-custom-attn-mask', action="store_true", help="Use the custom attention mask (BeaconAttention)")
 parser.add_argument('-w', '--window-size', type=int, help="Window Size")
 
@@ -139,11 +119,6 @@ model.config
 
 # %%
 
-if use_embedding:
-    beacon_embedding = BeaconEmbedding(embedding=model.get_input_embeddings(), vocab_size=model.config.vocab_size, n_embed=model.config.hidden_size, window_length=window_size)
-    beacon_embedding = beacon_embedding.to(model.device)
-    model.set_input_embeddings(beacon_embedding)
-
 beacon_attention_mask = generate_beacon_attention_mask_2d(block_size, window_length=window_size, device=device)
 # beacon_attention_mask = beacon_attention_mask.unsqueeze(0).repeat(batch_size, 1, 1)
 
@@ -186,9 +161,9 @@ accelerator = Accelerator() # Logging with wandb here isn't working as expected 
 wandb.init(
     project="beacon-attention-1m",
     config={
-        "use_custom_embedding": use_embedding,
         "use_custom_attn_mask": use_custom_attn_mask,
         "window_size": window_size,
+        "summarization": TRue
     }
 )
 
