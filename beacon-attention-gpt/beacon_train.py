@@ -55,9 +55,13 @@ def causal_lm_loss(inputs, logits, alpha=1.0):
     shift_labels = inputs[..., 1:].contiguous()
     shift_logits = logits[..., :-1, :].contiguous()
 
+    print(shift_labels, shift_logits)
+
     mask = (shift_labels != sep_token)
     shift_labels = shift_labels[mask]
     shift_logits = shift_logits[mask]
+
+    print(shift_labels, shift_logits)
 
     # Calculate per-token loss
     loss_fct = CrossEntropyLoss(reduce=False)
