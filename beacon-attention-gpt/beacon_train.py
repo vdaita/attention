@@ -17,6 +17,7 @@ def generate_beacon_attention_mask_2d(size, window_length=4, direct_window_multi
     return mask_tensor.tril()
 
 sep_token = 186 # This corresponds to token: þ in the tokenizer for TinyStories-1m
+sep_char = 'þ'
 
 # %%
 # Change config here:
@@ -55,6 +56,11 @@ def causal_lm_loss(inputs, logits, alpha=1.0):
     # Shift so that tokens < n predict n
     shift_labels = inputs[..., 1:].contiguous()
     shift_logits = logits[..., :-1, :].contiguous()
+
+    mask = (shift_labels != sep_token)
+    shift_labels = shift_labels[mask]
+    shift_logits = shift_logits[mask]
+
     # Calculate per-token loss
     loss_fct = CrossEntropyLoss(reduce=False)
     loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
@@ -68,8 +74,15 @@ def causal_lm_loss(inputs, logits, alpha=1.0):
 from datasets import load_dataset
 
 def tokenize(element):
+    text_with_pause = []
+    for i in range(len(element['text'])):
+        if (i + 1) % window_size == 0:
+            text_with_pause.append(sep_char)
+        text_with_pause.append(element['text'][i])
+    text_with_pause = ''.join(text_with_pause)
+
     outputs = tokenizer(
-        element["text"],
+        text_with_pause,
         truncation=True,
         max_length=block_size,
         return_overflowing_tokens=True,
@@ -163,7 +176,7 @@ wandb.init(
     config={
         "use_custom_attn_mask": use_custom_attn_mask,
         "window_size": window_size,
-        "summarization": TRue
+        "summarization": True
     }
 )
 
