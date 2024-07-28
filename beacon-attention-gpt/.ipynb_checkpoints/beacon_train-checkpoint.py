@@ -51,52 +51,28 @@ tokenizer = AutoTokenizer.from_pretrained("roneneldan/TinyStories-1M")
 from torch.nn import CrossEntropyLoss
 import torch
 
-def regular_loss(inputs, logits, alpha=1.0):
-    shift_labels = inputs[..., 1:].continguous()
+
+def causal_lm_loss(inputs, logits, alpha=1.0):
+    # Shift so that tokens < n predict n
+    shift_labels = inputs[..., 1:].contiguous()
     shift_logits = logits[..., :-1, :].contiguous()
 
-    loss_fct = CrossEntropyLoss(reduce=False)
-    loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
-    loss_per_sample = loss.view(shift_logits.size(0), shift_logits.size(1)).mean(axis=1)
-
-    return loss_per_sample.mean()
-
-def loss_ignoring_token(inputs, logits, alpha=1.0)
-        
-    shift_labels = inputs[..., 1:].continguous()
-    shift_logits = logits[..., :-1, :].contiguous()
-
+    # Mask to ignore token 186
     mask = (shift_labels != sep_token)
-    shift_labels = shift_labels[mask]
-    shift_logics = shift_logits[mask]
 
-    loss_fct = CrossEntropyLoss(reduce=False)
+    # Calculate per-token loss
+    loss_fct = CrossEntropyLoss(reduction='none')
     loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
-    loss_per_sample = loss.view(shift_logits.size(0), shift_logits.size(1)).mean(axis=1)
 
-    return loss_per_sample.mean()
+    # Apply mask
+    loss = loss * mask.view(-1).float()
+
+    # Resize and average loss per sample
+    loss_per_sample = loss.view(shift_logits.size(0), shift_logits.size(1)).sum(axis=1) / mask.view(shift_logits.size(0), shift_logits.size(1)).sum(axis=1).float()
     
-# def causal_lm_loss(inputs, logits, alpha=1.0):
-#     # Shift so that tokens < n predict n
-#     shift_labels = inputs[..., 1:].contiguous()
-#     shift_logits = logits[..., :-1, :].contiguous()
-
-#     # Mask to ignore token 186
-#     mask = (shift_labels != sep_token)
-
-#     # Calculate per-token loss
-#     loss_fct = CrossEntropyLoss(reduction='none')
-#     loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
-
-#     # Apply mask
-#     loss = loss * mask.view(-1).float()
-
-#     # Resize and average loss per sample
-#     loss_per_sample = loss.view(shift_logits.size(0), shift_logits.size(1)).sum(axis=1) / mask.view(shift_logits.size(0), shift_logits.size(1)).sum(axis=1).float()
-    
-#     # Calculate average
-#     loss = loss_per_sample.mean()
-#     return loss
+    # Calculate average
+    loss = loss_per_sample.mean()
+    return loss
 
 # %%
 from datasets import load_dataset
