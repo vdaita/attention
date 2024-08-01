@@ -5,10 +5,10 @@ from tqdm import tqdm
 
 ds = load_dataset("nuprl/EditPackFT", split="train")
 # Generate a diff, mask some lines of code arbitrarily, and train on predicting the commit message
-
+ds = ds.select(range(10))
 generated_dict = {
     "before": [],
-    "intermediate_changes": [],
+    "intermediate": [],
     "after": [],
     "subject": [],
     "intermediate_diff": []
@@ -16,49 +16,52 @@ generated_dict = {
 for row in tqdm(ds):
     before_lines = row['old_contents'].splitlines()
     after_lines = row['new_contents'].splitlines()
-    
-    sm = difflib.SequenceMatcher(None, before_lines, after_lines)
-    lines_written = 0
-    for tag, i1, i2, j1, j2 in sm.get_opcodes():
-        if tag == 'replace':
-            lines_written += j2 - j1
-        elif tag == 'insert':
-            lines_written += j2 - j1
-    if lines_written < 10:
+
+    diff = list(difflib.unified_diff(before_lines, after_lines, n=100000000))
+    new_lines = []
+
+    largest_contiguous_add_length = 0
+    largest_contiguous_add_start_line = 0
+
+    line_idx = 0
+    while line_idx < len(diff):
+        if diff[line_idx].startswith("+"):
+            contiguous_add = 0
+            contiguous_add_start = line_idx
+            while line_idx < len(diff) and diff[line_idx].startswith("+") :
+                line_idx += 1
+                contiguous_add += 1
+            if contiguous_add > largest_contiguous_add_length:
+                largest_contiguous_add_length = contiguous_add
+                largest_contiguous_add_start_line = contiguous_add_start
+        else:
+            line_idx += 1
+
+    if largest_contiguous_add_length > 6:
         continue
 
-    intermediate_change_file = ""
-    
-    lines_count = 0
-    
-    for tag, i1, i2, j1, j2 in sm.get_opcodes():
-        if tag == 'equal':
-            intermediate_change_file += "\n".join(before_lines[i1:i2]) + "\n"
-        elif tag == 'insert': # make sure that this isn't an import statement
-            if lines_count < 2:
-                for line in after_lines:
-                    if not("from" in line or "import" in line):
-                        intermediate_change_file += line + "\n"
-                        lines_count += 1
-                # intermediate_change_file += "\n".join(after_lines[j1:j2])
-        elif tag == 'replace':
-            if lines_count < 2:
-                for line in after_lines:
-                    if not("from" in line or "import" in line):
-                        intermediate_change_file += line + "\n"
-                        lines_count += 1
-            else:
-                intermediate_change_file += "\n".join(before_lines[i1:i2])
-        elif tag == 'delete':
-            intermediate_change_file += "\n".join(before_lines[i1:i2])
-
-    intermediate_diff = "\n".join(difflib.unified_diff(before_lines, intermediate_change_file.splitlines(), n=2))
+    # intermediate_diff = diff
+    intermediate_diff = diff[:largest_contiguous_add_start_line + 3] + diff[largest_contiguous_add_start_line + largest_contiguous_add_length:]
+    diff_sr = diff_utils.parse_diff("\n".join(intermediate_diff))
+    partial_edited = row['old_contents']
+    for sr in diff_sr:
+        partial_edited = partial_edited.replace(sr.search_block, sr.replace_block)
     
     generated_dict["before"].append(row['old_contents'])
+    generated_dict["intermediate"].append(''.join(difflib.restore(intermediate_diff, 2)))
     generated_dict["after"].append(row['new_contents'])
-    generated_dict["intermediate_changes"].append(intermediate_change_file)
     generated_dict["subject"].append(row['subject'])
-    generated_dict["intermediate_diff"].append(intermediate_diff)
+    generated_dict["intermediate_diff"].append("\n".join(intermediate_diff))
+
+    print(generated_dict["before"][-1])
+    print("-----------")
+    print(generated_dict["intermediate"][-1])
+    print("-----------")
+    print(generated_dict["after"][-1])
+    print("-----------")
+    print(generated_dict["intermediate_diff"][-1])
+    print("===========")
+
 
 diff_ds = Dataset.from_dict(generated_dict)
-diff_ds.push_to_hub("vdaita/EditPackFTIntermediate")
+# diff_ds.push_to_hub("vdaita/EditPackFTIntermediate")
